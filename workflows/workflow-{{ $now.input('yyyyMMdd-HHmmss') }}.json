@@ -1,0 +1,169 @@
+{
+  "name": "Manutencao Pedido Cliente",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "novo-pedido"
+      },
+      "id": "webhookTrigger",
+      "name": "Receber Pedido Cliente",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "jsonParameters": true,
+      "position": [
+        480,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "values": [
+          {
+            "name": "total_items",
+            "value": "={{$json.items.length}}",
+            "alwaysSet": true
+          },
+          {
+            "name": "customer_id",
+            "value": "={{$json.client_id}}",
+            "alwaysSet": true
+          },
+          {
+            "name": "customer_email",
+            "value": "={{$json.customer.contact.email}}",
+            "alwaysSet": true
+          },
+          {
+            "name": "order_value_bruto",
+            "value": "={{ $json.products.reduce((acc, p) => acc + (p.price * p.qty), 0) }}",
+            "alwaysSet": true
+          }
+        ],
+        "options": {}
+      },
+      "id": "prepararDadosPedido",
+      "name": "Preparar Dados do Pedido",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "jsonParameters": true,
+      "position": [
+        730,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.fakevalidator.com/v1/clientes/validate",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": [
+          {
+            "name": "Authorization",
+            "value": "Bearer invalid-token-123"
+          }
+        ],
+        "sendBody": true,
+        "bodyParameters": [
+          {
+            "name": "id",
+            "value": "={{$node[\"prepararDadosPedido\"].json.customer_id}}"
+          },
+          {
+            "name": "email",
+            "value": "={{$node[\"prepararDadosPedido\"].json.customer_email}}"
+          }
+        ],
+        "options": {}
+      },
+      "id": "validarClienteExterno",
+      "name": "Validar Cliente Externo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "jsonParameters": true,
+      "position": [
+        1000,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": [
+          {
+            "node": "validarClienteExterno",
+            "value1": "={{$node[\"validarClienteExterno\"].json.data.isValid}}",
+            "operator": "isTrue",
+            "value2": ""
+          }
+        ]
+      },
+      "id": "verificarValidacaoCliente",
+      "name": "Verificar Validação Cliente",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "jsonParameters": true,
+      "position": [
+        1270,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const customerId = $node[\"webhookTrigger\"].json.body.customer.id_validated;\nconst products = $node[\"webhookTrigger\"].json.body.products;\n\nconst processedProducts = products.map(item => ({\n  id: item.id,\n  name: item.product_name, // Intentionally wrong field name\n  quantity: item.qty,\n  price: item.price,\n}));\n\nreturn [\n  {\n    json: {\n      customer_id_validated: customerId,\n      processed_items: processedProducts,\n      processing_status: 'ok',\n      processedOrderId: $node[\"prepararDadosPedido\"].json.order_value_bruto\n    },\n  },\n];"
+      },
+      "id": "processarPedidoValidado",
+      "name": "Processar Pedido Validado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "jsonParameters": false,
+      "position": [
+        1530,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "values": [
+          {
+            "name": "final_status",
+            "value": "Order {{ $node[\"processarPedidoValidado\"].json.orderId }} processed successfully. Customer: {{ $node[\"processarPedidoValidado\"].json.customer_id_validated }}",
+            "alwaysSet": true
+          }
+        ],
+        "options": {}
+      },
+      "id": "prepararRespostaFinal",
+      "name": "Preparar Resposta Final",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "jsonParameters": true,
+      "position": [
+        1800,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "Receber Pedido Cliente": {
+      "main": []
+    },
+    "Preparar Dados do Pedido": {
+      "main": []
+    },
+    "Validar Cliente Externo": {
+      "main": []
+    },
+    "Verificar Validação Cliente": {
+      "main": []
+    },
+    "Processar Pedido Validado": {
+      "main": []
+    },
+    "Preparar Resposta Final": {
+      "main": []
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "b6a7114b-610e-4363-9528-912b70f20d0f"
+}
