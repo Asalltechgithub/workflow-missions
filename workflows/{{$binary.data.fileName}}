@@ -1,0 +1,212 @@
+{
+  "name": "User Registration Workflow with Bugs",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "id": "node1",
+      "alwaysOutputData": true,
+      "webhookPath": "register",
+      "webhookMethods": [
+        "POST"
+      ],
+      "position": [
+        200,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "merge",
+        "values": [
+          {
+            "name": "name",
+            "value": "={{ $json.name }}"
+          },
+          {
+            "name": "userEmail",
+            "value": "={{ $json.email }}"
+          },
+          {
+            "name": "hashedPassword",
+            "value": "=HASH_{{ $json.password }}"
+          }
+        ]
+      },
+      "name": "Prepare User Data for API",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "id": "node2",
+      "position": [
+        400,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.name }}",
+              "operation": "isNotEmpty"
+            },
+            {
+              "value1": "={{ $json.email }}",
+              "operation": "contains",
+              "value2": "@"
+            }
+          ]
+        }
+      },
+      "name": "Validate Input Fields",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "id": "node3",
+      "position": [
+        600,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.fake-user-service.com/users",
+        "method": "POST",
+        "bodyParameters": true,
+        "jsonBody": true,
+        "bodyContent": "={{{\"name\": $json.name, \"email\": $json.userEmail, \"password_hash\": $json.hashedPassword}}}",
+        "options": {
+          "authentication": "predefined",
+          "predefinedAuth": {
+            "authProvider": {
+              "type": "headerAuth",
+              "headerAuth": {
+                "headerName": "Authorization",
+                "headerValue": "Bearer invalid_secret_token_123"
+              }
+            }
+          }
+        }
+      },
+      "name": "Create User API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "id": "node4",
+      "position": [
+        800,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const responseData = items[0].json;\n\nlet userId = 'N/A';\nlet apiStatus = 'API_CALL_FAILED';\n\n// Intentionally accessing properties directly without checking if they exist\nif (responseData.data && responseData.data.id) {\n  userId = responseData.data.id;\n}\n\nif (responseData.status === 'success') {\n  apiStatus = 'SUCCESS';\n}\n\nreturn [{json: { userId: userId, apiStatus: apiStatus }}];"
+      },
+      "name": "Process API Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "id": "node5",
+      "position": [
+        1000,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "merge",
+        "values": [
+          {
+            "name": "message",
+            "value": "=User registration attempted for {{ $json.name }}. Result: ID {{ $json.userId }}, Status: {{ $json.apiStatus }}"
+          }
+        ]
+      },
+      "name": "Prepare Success Notification",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "id": "node6",
+      "position": [
+        1200,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://notify.fake-notifier.com/success",
+        "method": "POST",
+        "bodyParameters": true,
+        "jsonBody": true,
+        "bodyContent": "={{{\"type\": \"user_registration_result\", \"details\": $json.message}}}",
+        "options": {}
+      },
+      "name": "Send Success Notification",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "id": "node7",
+      "webhookPath": "notify-success",
+      "webhookMethods": [
+        "POST"
+      ],
+      "position": [
+        1400,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "merge",
+        "values": [
+          {
+            "name": "message",
+            "value": "=User registration failed validation for name: {{ $json.name }}, email provided: {{ $json.email }}."
+          }
+        ]
+      },
+      "name": "Prepare Validation Fail Notification",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "id": "node8",
+      "position": [
+        1600,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://notify.fake-notifier.com/validation_fail",
+        "method": "POST",
+        "bodyParameters": true,
+        "jsonBody": true,
+        "bodyContent": "={{{\"type\": \"user_validation_failure\", \"details\": $json.message}}}",
+        "options": {}
+      },
+      "name": "Send Validation Fail Notification",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "id": "node9",
+      "webhookPath": "notify-validation",
+      "webhookMethods": [
+        "POST"
+      ],
+      "position": [
+        1800,
+        250
+      ]
+    }
+  ],
+  "connections": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "active": false,
+  "settings": {},
+  "id": "buggy_user_registration_workflow",
+  "staticData": null,
+  "pinData": {}
+}
