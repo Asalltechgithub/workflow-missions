@@ -1,0 +1,253 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "order-process",
+        "options": {}
+      },
+      "name": "WebhookTrigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+      "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+      "credentials": {},
+      "position": [
+        200,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "values": [
+          {
+            "name": "queryId",
+            "value": "={{ $json.order_id }}"
+          },
+          {
+            "name": "api_key_header",
+            "value": "super-secret-allyson-key"
+          }
+        ],
+        "options": {}
+      },
+      "name": "PrepareRequestData",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "uuid": "b2c3d4e5-f6a7-8901-2345-67890abcdef0",
+      "id": "b2c3d4e5-f6a7-8901-2345-67890abcdef0",
+      "credentials": {},
+      "position": [
+        400,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.fake-orders.com/v1/order/{{ $json.queryId }}",
+        "authentication": "headers",
+        "httpMethod": "GET",
+        "sendHeaders": [
+          {
+            "name": "x-api-token",
+            "value": "={{ $json.api_key_header }}"
+          }
+        ],
+        "options": {}
+      },
+      "name": "GetOrderDetails",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "uuid": "c3d4e5f6-a7b8-9012-3456-7890abcdef01",
+      "id": "c3d4e5f6-a7b8-9012-3456-7890abcdef01",
+      "credentials": {},
+      "position": [
+        600,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "for (const item of items) {\n  // BUG: Referencing an incorrect path for status. Expected: item.json.data.status\n  const orderStatus = item.json.response.orderStatus;\n\n  // BUG: Referencing a field that might not exist in the response. Expected: item.json.data.customerInfo.name\n  const customerName = item.json.orderDetails.customerName || 'Unknown Customer';\n\n  item.json.processedStatus = orderStatus;\n  item.json.customerName = customerName;\n}",
+        "options": {}
+      },
+      "name": "ProcessApiResponse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "uuid": "d4e5f6a7-b8c9-0123-4567-890abcdef012",
+      "id": "d4e5f6a7-b8c9-0123-4567-890abcdef012",
+      "credentials": {},
+      "position": [
+        800,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": [
+          {
+            "id": "d0e1b2c3-4f5e-6d7c-8b9a-0123456789ab",
+            "type": "string",
+            "property": "={{ $node.ProcessApiResponse.json.processedStatus }}",
+            "operation": "equal",
+            "value": "DELIVERED"
+          }
+        ],
+        "options": {}
+      },
+      "name": "IfOrderDelivered",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "uuid": "e5f6a7b8-c9d0-1234-5678-90abcdef0123",
+      "id": "e5f6a7b8-c9d0-1234-5678-90abcdef0123",
+      "credentials": {},
+      "position": [
+        1000,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "values": [
+          {
+            "name": "message",
+            "value": "Order {{ $node.WebhookTrigger.json.orderId }} successfully processed for customer {{ $node.ProcessApiResponse.json.customerName }}."
+          }
+        ],
+        "options": {}
+      },
+      "name": "SuccessMessage",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "uuid": "f6a7b8c9-d0e1-2345-6789-0abcdef01234",
+      "id": "f6a7b8c9-d0e1-2345-6789-0abcdef01234",
+      "credentials": {},
+      "position": [
+        1200,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "values": [
+          {
+            "name": "message",
+            "value": "Failed to process order {{ $node.WebhookTrigger.json.orderId }}. Current status: {{ $node.ProcessApiResponse.json.processedStatus || 'UNKNOWN' }}."
+          }
+        ],
+        "options": {}
+      },
+      "name": "FailureMessage",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "uuid": "a7b8c9d0-e1f2-3456-7890-abcdef012345",
+      "id": "a7b8c9d0-e1f2-3456-7890-abcdef012345",
+      "credentials": {},
+      "position": [
+        1400,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "join": [
+          {
+            "node": "SuccessMessage",
+            "type": "main"
+          },
+          {
+            "node": "FailureMessage",
+            "type": "main"
+          }
+        ],
+        "options": {}
+      },
+      "name": "JoinMessages",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 1,
+      "uuid": "b8c9d0e1-f2a3-4567-8901-bcdef0123456",
+      "id": "b8c9d0e1-f2a3-4567-8901-bcdef0123456",
+      "credentials": {},
+      "position": [
+        1600,
+        250
+      ]
+    }
+  ],
+  "connections": {
+    "WebhookTrigger": {
+      "main": [
+        [
+          "PrepareRequestData",
+          0
+        ]
+      ]
+    },
+    "PrepareRequestData": {
+      "main": [
+        [
+          "GetOrderDetails",
+          0
+        ]
+      ]
+    },
+    "GetOrderDetails": {
+      "main": [
+        [
+          "ProcessApiResponse",
+          0
+        ]
+      ]
+    },
+    "ProcessApiResponse": {
+      "main": [
+        [
+          "IfOrderDelivered",
+          0
+        ]
+      ]
+    },
+    "IfOrderDelivered": {
+      "main": [
+        [
+          "SuccessMessage",
+          0
+        ],
+        [
+          "FailureMessage",
+          0
+        ]
+      ]
+    },
+    "SuccessMessage": {
+      "main": [
+        [
+          "JoinMessages",
+          0
+        ]
+      ]
+    },
+    "FailureMessage": {
+      "main": [
+        [
+          "JoinMessages",
+          0
+        ]
+      ]
+    },
+    "JoinMessages": {
+      "main": [
+        [
+          "RespondToWebhook",
+          0
+        ]
+      ]
+    }
+  },
+  "name": "AllysonDebuggingChallengeWorkflow",
+  "version": 1,
+  "description": "Workflow with intentional bugs for Allyson to fix, including data reference errors, authentication issues, and logical flaws.",
+  "id": "d0e1f2a3-b4c5-6789-0123-def012345678",
+  "active": false
+}
